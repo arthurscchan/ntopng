@@ -2581,3 +2581,86 @@ void HTTPserver::addHTTPOption(const char* k, const char* v) {
 bool HTTPserver::accepts_requests() {
   return (can_accept_requests && !ntop->getGlobals()->isShutdown());
 };
+
+/* *********************************************************************************** */
+
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+
+/*
+ * OSS-Fuzz entry for fuzz_http_request: parse a fuzz-supplied raw HTTP
+ * request with the production parser (parse_http_message) and run the
+ * production handler (handle_lua_request) on a minimal in-memory
+ * connection. Responses are written to an AF_UNIX socketpair, so no TCP
+ * port is bound and no thread is spawned. The context mirrors what mongoose
+ * provides on a real connection; config stays all-NULL (all options unset),
+ * exactly like the pieces of setup the real server never performs.
+ */
+#include <sys/socket.h>
+#include <fcntl.h>
+
+extern "C" int ntopng_fuzz_http_request(const uint8_t *data, size_t size) {
+  static struct mg_context fz_ctx;
+  static bool fz_ctx_init = false;
+  struct mg_connection conn;
+  char *req;
+  char drain[4096];
+  int pair[2], request_len;
+
+  if (size < 4 || size > 32768) return (0);
+
+  if (!fz_ctx_init) {
+    memset(&fz_ctx, 0, sizeof(fz_ctx));
+    fz_ctx.callbacks.log_message = handle_http_message;
+    fz_ctx_init = true;
+  }
+
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair) != 0) return (0);
+
+  /* Read end non-blocking: a handler writing more than the socket buffer
+   * gets EAGAIN instead of wedging the fuzz run. */
+  fcntl(pair[0], F_SETFL, O_NONBLOCK);
+
+  /* Heap copy with the trailing slack the real connection buffer always
+   * has: mongoose's parse_http_message() memcmp()s up to 5 bytes of
+   * http_version and get_request_len() scans to buf_len, both relying on
+   * conn->buf having capacity beyond the request bytes (buf_size). The
+   * +64 zeroed tail keeps the sanitizer bound tight and deterministic
+   * while matching that contract. */
+  if ((req = (char *)calloc(1, size + 64)) == NULL) {
+    close(pair[0]);
+    close(pair[1]);
+    return (0);
+  }
+  memcpy(req, data, size);
+  req[size] = '\0';
+
+  memset(&conn, 0, sizeof(conn));
+  conn.ctx = &fz_ctx;
+  conn.buf = req;
+  conn.buf_size = (int)(size + 64);
+  conn.data_len = (int)size;
+  conn.client.sock = pair[1];
+  conn.birth_time = time(NULL);
+  conn.must_close = 1;
+
+  if ((request_len = parse_http_message(req, (int)size,
+					&conn.request_info)) > 0) {
+    /* Same Content-Length handling as mongoose's getreq(): header value,
+     * else 0 (mg_read() then serves only the buffered bytes). */
+    const char *cl = get_header(&conn.request_info, "Content-Length");
+
+    conn.request_len = request_len;
+    conn.content_len = (cl != NULL) ? strtoll(cl, NULL, 10) : 0;
+    handle_lua_request(&conn);
+  }
+
+  free(req);
+  close(pair[1]);
+
+  /* Drain what the handler wrote. */
+  while (read(pair[0], drain, sizeof(drain)) > 0) { /* keep draining */ }
+  close(pair[0]);
+
+  return (0);
+}
+#endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */
