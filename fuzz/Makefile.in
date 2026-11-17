@@ -1,6 +1,6 @@
 @PRO_MAKEFILE_INC@
 
-FUZZ_TARGETS := fuzz/fuzz_dissect_packet fuzz/fuzz_zmq_flow fuzz/fuzz_snmp_response fuzz/fuzz_syslog_parse fuzz/fuzz_dissect_mdns
+FUZZ_TARGETS := fuzz/fuzz_dissect_packet fuzz/fuzz_zmq_flow fuzz/fuzz_snmp_response fuzz/fuzz_syslog_parse fuzz/fuzz_dissect_mdns fuzz/fuzz_mdns_decode
 FUZZ_CORPUS := $(addsuffix _seed_corpus.zip,$(FUZZ_TARGETS))
 
 FUZZ_LOCAL_TEST := @FUZZ_LOCAL_TEST@
@@ -73,5 +73,8 @@ fuzz/fuzz_syslog_parse_seed_corpus.zip: $$(wildcard fuzz/corpus/fuzz_syslog_pars
 	zip -j $@ $^
 
 fuzz/fuzz_dissect_mdns_seed_corpus.zip: $$(wildcard fuzz/corpus/fuzz_dissect_mdns/*)
+	zip -j $@ $^
+
+fuzz/fuzz_mdns_decode_seed_corpus.zip: $$(wildcard fuzz/corpus/fuzz_mdns_decode/*)
 	zip -j $@ $^
 

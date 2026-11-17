@@ -59,6 +59,20 @@ class MDNS {
   bool sendAnyQuery(char* targetIPv4, char* query);
   bool queueResolveIPv4(u_int32_t ipv4addr, bool alsoUseGatewayDNS);
   void fetchResolveResponses(lua_State* vm, int32_t timeout_sec);
+
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+  /* OSS-Fuzz entries: decodePTRResponse(), decodeAnyResponse() and
+   * decodeNetBIOS() parse name-resolution responses received from the
+   * network (mDNS responders, gateways and NetBIOS name servers), but they
+   * are private and only reachable through the UDP resolver loop. These
+   * thin wrappers let the fuzz target exercise them without sockets. */
+  char* fuzzDecodePTRResponse(char* mdnsbuf, u_int mdnsbuf_len, char* buf,
+                              u_int buf_len, u_int32_t* resolved_ip);
+  char* fuzzDecodeAnyResponse(char* mdnsbuf, u_int mdnsbuf_len, char* buf,
+                              u_int buf_len);
+  char* fuzzDecodeNetBIOS(u_char* nbnsbuf, u_int nbnsbuf_len, char* out,
+                          u_int out_len);
+#endif
 };
 
 #endif /* _MDNS_H_ */

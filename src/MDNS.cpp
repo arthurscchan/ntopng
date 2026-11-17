@@ -490,3 +490,32 @@ char* MDNS::decodeNetBIOS(u_char* buf, u_int buf_len, char* out,
 
   return (out);
 }
+
+/* ******************************* */
+
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+
+/* OSS-Fuzz entries for fuzz_mdns_decode: decodePTRResponse(),
+ * decodeAnyResponse() and decodeNetBIOS() parse name-resolution responses
+ * received from the network (mDNS responders, gateways and NetBIOS name
+ * servers), but they are private and only reachable through the UDP
+ * resolver loop; these thin wrappers let the fuzz target exercise them
+ * without sockets. */
+
+char* MDNS::fuzzDecodePTRResponse(char* mdnsbuf, u_int mdnsbuf_len,
+                                  char* buf, u_int buf_len,
+                                  u_int32_t* resolved_ip) {
+  return (decodePTRResponse(mdnsbuf, mdnsbuf_len, buf, buf_len, resolved_ip));
+}
+
+char* MDNS::fuzzDecodeAnyResponse(char* mdnsbuf, u_int mdnsbuf_len,
+                                  char* buf, u_int buf_len) {
+  return (decodeAnyResponse(mdnsbuf, mdnsbuf_len, buf, buf_len));
+}
+
+char* MDNS::fuzzDecodeNetBIOS(u_char* nbnsbuf, u_int nbnsbuf_len,
+                              char* out, u_int out_len) {
+  return (decodeNetBIOS(nbnsbuf, nbnsbuf_len, out, out_len));
+}
+
+#endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */

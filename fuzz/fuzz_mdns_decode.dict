@@ -1,0 +1,18 @@
+# Tokens from ntopng's name-resolution decoders (src/MDNS.cpp): DNS header
+# fields, mDNS label conventions, record types and the NetBIOS NBSTAT gates.
+"\x12\x34"
+"\x00\x01"
+"\x00\x0c"
+"\x00\x10"
+"\x00\x21"
+"\x00\xff"
+"\xc0\x0c"
+"local"
+"_services"
+"_dns-sd"
+"_udp"
+"_dhcp"
+"in-addr"
+"arpa"
+"NTOPNG"
+"\x20\x43\x4b\x41\x41"
